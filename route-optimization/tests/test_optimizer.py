@@ -42,11 +42,18 @@ def test_every_location_is_visited_exactly_once():
     assert len(middle_stops) == len(set(middle_stops))
 
 
-def test_total_distance_is_positive_integer():
+def test_total_distance_matches_returned_route():
     result = solve_route(LOCATIONS, DISTANCE_MATRIX, depot=0)
-    assert isinstance(result["total_distance"], int)
-    assert result["total_distance"] > 0
 
+    route = result["route"]
+    route_indices = [LOCATIONS.index(location) for location in route]
+
+    expected_distance = sum(
+        DISTANCE_MATRIX[from_node][to_node]
+        for from_node, to_node in zip(route_indices, route_indices[1:])
+    )
+
+    assert result["total_distance"] == expected_distance
 
 def test_smaller_four_location_case():
     locations = ["Depot", "A", "B", "C"]

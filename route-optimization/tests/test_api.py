@@ -81,3 +81,17 @@ def test_negative_distance_rejected():
     }
     response = client.post("/optimize-route", json=payload)
     assert response.status_code == 422
+def test_too_many_locations_rejected():
+    locations = [f"Location{i}" for i in range(101)]
+    distance_matrix = [[0] * 101 for _ in range(101)]
+
+    response = client.post(
+        "/optimize-route",
+        json={
+            "locations": locations,
+            "distance_matrix": distance_matrix,
+            "depot": 0,
+        },
+    )
+
+    assert response.status_code == 422
