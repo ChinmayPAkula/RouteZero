@@ -12,4 +12,4 @@
 - [ ] Yes
 - [ ] No
 
-## Notes for reviewergit
+## Notes for reviewer
