@@ -64,23 +64,59 @@ Request:
 }
 ```
 
+
+### Replace ONLY that part with:
+
+```markdown
 Response shape:
 
 ```json
 {
-  "route": ["VIT Vellore", "Vellore Fort", "CMC Vellore", "Katpadi Railway Station", "Chennai Central"],
-  "coordinates": [
-    {"name": "VIT Vellore", "latitude": 12.0, "longitude": 79.0}
-  ],
-  "total_distance": 150000,
-  "total_duration": 10800,
-  "total_distance_km": 150.0,
-  "total_duration_minutes": 180.0,
-  "distance_unit": "meters",
-  "duration_unit": "seconds"
+  "normal_route": {
+    "route": [
+      "VIT Vellore",
+      "Katpadi Railway Station",
+      "Vellore Fort",
+      "CMC Vellore",
+      "Chennai Central"
+    ],
+    "coordinates": [
+      {
+        "name": "VIT Vellore",
+        "latitude": 12.0,
+        "longitude": 79.0
+      }
+    ],
+    "total_distance": 150000,
+    "total_duration": 10800,
+    "total_distance_km": 150.0,
+    "total_duration_minutes": 180.0,
+    "distance_unit": "meters",
+    "duration_unit": "seconds"
+  },
+  "optimized_route": {
+    "route": [
+      "VIT Vellore",
+      "Vellore Fort",
+      "CMC Vellore",
+      "Katpadi Railway Station",
+      "Chennai Central"
+    ],
+    "coordinates": [
+      {
+        "name": "VIT Vellore",
+        "latitude": 12.0,
+        "longitude": 79.0
+      }
+    ],
+    "total_distance": 140000,
+    "total_duration": 10000,
+    "total_distance_km": 140.0,
+    "total_duration_minutes": 166.7,
+    "distance_unit": "meters",
+    "duration_unit": "seconds"
+  }
 }
-```
-
 Values above illustrate the response format; production values come from OSRM.
 
 ## Tests
