@@ -1,8 +1,8 @@
 import httpx
 import pytest
 
-from app.errors import LocationNotFoundError, OutsideTamilNaduError
-from app.geocoding import geocode_location
+from route_optimization.errors import LocationNotFoundError, OutsideTamilNaduError
+from route_optimization.geocoding import geocode_location
 
 
 def _client(handler):
