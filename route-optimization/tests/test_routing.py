@@ -21,12 +21,25 @@ def test_osrm_matrices(monkeypatch):
                 "distances": [[0, 1000.4], [1001.2, 0]],
                 "durations": [[0, 120.2], [121.1, 0]],
             },
-            request=httpx.Request("GET", "https://example.test"),
+            request=httpx.Request(
+                "GET",
+                "https://example.test",
+            ),
         )
+
     monkeypatch.setattr(routing.httpx, "get", fake_get)
+
     distances, durations = routing.get_route_matrices(POINTS)
-    assert distances == [[0, 1000], [1001, 0]]
-    assert durations == [[0, 120], [121, 0]]
+
+    assert distances == [
+        [0, 1000],
+        [1001, 0],
+    ]
+
+    assert durations == [
+        [0, 120],
+        [121, 0],
+    ]
 
 
 def test_osrm_null_route_rejected(monkeypatch):
@@ -38,8 +51,44 @@ def test_osrm_null_route_rejected(monkeypatch):
                 "distances": [[0, None], [None, 0]],
                 "durations": [[0, None], [None, 0]],
             },
-            request=httpx.Request("GET", "https://example.test"),
+            request=httpx.Request(
+                "GET",
+                "https://example.test",
+            ),
         )
+
     monkeypatch.setattr(routing.httpx, "get", fake_get)
+
     with pytest.raises(RoutingError):
+        routing.get_route_matrices(POINTS)
+
+
+def test_osrm_non_object_response_rejected(monkeypatch):
+    """
+    OSRM must return a JSON object.
+
+    This prevents an AttributeError if the service unexpectedly
+    returns a JSON array or another non-dict response.
+    """
+
+    def fake_get(*args, **kwargs):
+        return httpx.Response(
+            200,
+            json=[
+                "unexpected",
+                "list",
+                "response",
+            ],
+            request=httpx.Request(
+                "GET",
+                "https://example.test",
+            ),
+        )
+
+    monkeypatch.setattr(routing.httpx, "get", fake_get)
+
+    with pytest.raises(
+        RoutingError,
+        match="Invalid routing response",
+    ):
         routing.get_route_matrices(POINTS)
