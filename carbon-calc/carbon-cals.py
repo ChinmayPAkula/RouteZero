@@ -1,13 +1,17 @@
 import json
 import math
 
+# Emission Factors (kg CO2 per unit)
+# Direct tailpipe combustion factors (Scope 1) via DEFRA / EPA / ARAI.
+# Scope 2 grid electricity factor (fixed-scope benchmark estimate) via CEA India / UK DEFRA OGL.
 EMISSION_FACTORS = {
     "petrol": 2.31,     # kg CO2 / Liter
     "diesel": 2.68,     # kg CO2 / Liter
     "cng": 2.75,        # kg CO2 / kg
-    "electric": 0.475   # kg CO2 / kWh (Scope 2 National Grid Average)
+    "electric": 0.475   # kg CO2 / kWh
 }
 
+# Standard default fuel assigned if not explicitly provided
 DEFAULT_VEHICLE_FUELS = {
     "two_wheeler": "petrol",
     "sedan": "petrol",
@@ -17,6 +21,7 @@ DEFAULT_VEHICLE_FUELS = {
     "auto": "cng",
 }
 
+# Full matrix: 6 vehicle categories across 4 fuel types (24 combinations)
 VEHICLE_PROFILES = {
     "two_wheeler": {
         "petrol": {"default_efficiency": 50.0, "unit": "km/L"},
@@ -56,6 +61,7 @@ VEHICLE_PROFILES = {
     },
 }
 
+# Normalization mapping for common naming variations
 VEHICLE_ALIASES = {
     "bike": "two_wheeler",
     "two wheeler": "two_wheeler",
@@ -80,7 +86,6 @@ VEHICLE_ALIASES = {
     "ev_car": "sedan",
 }
 
-# Maps Google Maps API route traffic speed readings & colors
 GMAPS_TRAFFIC_MAP = {
     "blue": "free_flow",
     "normal": "free_flow",
@@ -114,15 +119,13 @@ def analyze_traffic_and_efficiency(
 ) -> tuple:
     """
     Computes (effective_efficiency, traffic_condition, congestion_index).
-    Accepts either an explicit traffic condition (e.g. from Google Maps) or derives it from speed.
+    Adapts based on speed tiers (for OSRM) or explicit traffic tags (for Google Maps).
     """
     fuel_lower = fuel.lower()
 
-    # If an explicit Google Maps condition was provided, resolve directly
     if traffic_condition:
-        condition = traffic_condition.lower()
-        if condition in GMAPS_TRAFFIC_MAP:
-            condition = GMAPS_TRAFFIC_MAP[condition]
+        cond_key = traffic_condition.lower()
+        condition = GMAPS_TRAFFIC_MAP.get(cond_key, "free_flow")
     elif avg_speed_kmh is not None:
         if avg_speed_kmh <= 25:
             condition = "heavy_traffic"
@@ -135,7 +138,7 @@ def analyze_traffic_and_efficiency(
     else:
         condition = "free_flow"
 
-    # Powertrain-specific attenuation based on resolved condition
+    # Powertrain-specific adjustments
     if fuel_lower == "electric":
         if condition == "heavy_traffic":
             return base_efficiency * 0.90, "heavy_traffic", 0.85
@@ -143,7 +146,7 @@ def analyze_traffic_and_efficiency(
             return base_efficiency * 0.95, "moderate_traffic", 0.45
         elif condition == "free_flow":
             return base_efficiency * 1.00, "free_flow", 0.10
-        else:  # high_speed_cruising
+        else:
             return base_efficiency * 0.80, "high_speed_cruising", 0.05
 
     elif fuel_lower == "diesel":
@@ -157,7 +160,7 @@ def analyze_traffic_and_efficiency(
             return base_efficiency * 0.88, "high_speed_cruising", 0.05
 
     else:
-        # Petrol / CNG light-duty curve
+        # Standard gasoline / Otto-cycle curve (DOE / ORNL baseline)
         if condition == "heavy_traffic":
             return base_efficiency * 0.70, "heavy_traffic", 0.85
         elif condition == "moderate_traffic":
@@ -176,7 +179,6 @@ def calculate_emissions(
     custom_efficiency: float = None,
     traffic_condition: str = None
 ) -> dict:
-    """Calculates emissions for a uniform single-leg trip or average segment."""
     vehicle_key = _normalize_vehicle_key(vehicle_class)
     if vehicle_key not in VEHICLE_PROFILES:
         return {"error": f"Unknown vehicle '{vehicle_class}'. Valid: {list(VEHICLE_PROFILES.keys())}"}
@@ -194,7 +196,10 @@ def calculate_emissions(
         fuel_key = _normalize_fuel_key(fuel_type)
 
     if fuel_key not in VEHICLE_PROFILES[vehicle_key]:
-        return {"error": f"Fuel '{fuel_type}' is not supported for '{vehicle_class}'."}
+        valid_fuels = list(VEHICLE_PROFILES[vehicle_key].keys())
+        return {
+            "error": f"Fuel '{fuel_type}' is not supported for '{vehicle_class}'. Valid options: {valid_fuels}"
+        }
 
     profile = VEHICLE_PROFILES[vehicle_key][fuel_key]
 
@@ -231,25 +236,87 @@ def calculate_emissions(
     }
 
 
+# =============================================================================
+# PRIMARY ROUTING COMPARISON (OSRM Pipeline: Distance + Speed)
+# =============================================================================
+
+def compare_routes(
+    normal_km: float,
+    normal_speed_kmh: float,
+    rz_km: float,
+    rz_speed_kmh: float,
+    vehicle_class: str,
+    fuel_type: str = None,
+    custom_efficiency: float = None
+) -> dict:
+    """
+    Primary API function for Nitish's OSRM backend.
+    Calculates emissions from route distances and average speeds (derived from OSRM durations).
+    """
+    normal = calculate_emissions(
+        distance_km=normal_km,
+        vehicle_class=vehicle_class,
+        fuel_type=fuel_type,
+        avg_speed_kmh=normal_speed_kmh,
+        custom_efficiency=custom_efficiency
+    )
+    route_zero = calculate_emissions(
+        distance_km=rz_km,
+        vehicle_class=vehicle_class,
+        fuel_type=fuel_type,
+        avg_speed_kmh=rz_speed_kmh,
+        custom_efficiency=custom_efficiency
+    )
+
+    if "error" in normal:
+        return normal
+    if "error" in route_zero:
+        return route_zero
+
+    # Unrounded raw calculations to preserve precision
+    normal_co2_raw = normal.get("_raw_co2_kg", normal["co2_kg"])
+    rz_co2_raw = route_zero.get("_raw_co2_kg", route_zero["co2_kg"])
+
+    # Signed differences: positive = reduction/savings, negative = deterioration/worse route
+    co2_saved = normal_co2_raw - rz_co2_raw
+    percentage_saved = (co2_saved / normal_co2_raw * 100) if normal_co2_raw > 0 else 0.0
+    congestion_reduction = normal["congestion_index"] - route_zero["congestion_index"]
+
+    # Strip internal calculation keys from API response
+    normal_display = {k: v for k, v in normal.items() if not k.startswith("_")}
+    rz_display = {k: v for k, v in route_zero.items() if not k.startswith("_")}
+
+    return {
+        "vehicle_type": vehicle_class,
+        "normal_route": normal_display,
+        "route_zero": rz_display,
+        "metrics_comparison": {
+            "co2_saved_kg": round(co2_saved, 2),
+            "co2_percentage_reduction": round(percentage_saved, 2),
+            "congestion_avoided": round(congestion_reduction, 2),
+            "normal_traffic": normal["traffic_condition"],
+            "route_zero_traffic": route_zero["traffic_condition"]
+        }
+    }
+
+
+# =============================================================================
+# STRETCH GOAL: Google Maps Traffic Segment Functions (Retained for future use)
+# =============================================================================
+
 def calculate_route_from_gmaps_segments(
     segments: list,
     vehicle_class: str,
     fuel_type: str = None,
     custom_efficiency: float = None
 ) -> dict:
-    """
-    Aggregates multi-segment route data received directly from Google Maps Directions/Routes API.
-    
-    Each element in `segments` must be a dict:
-        {"distance_km": float, "traffic": "blue" | "orange" | "red" | "normal" | "slow" | "traffic_jam"}
-        OR {"distance_km": float, "avg_speed_kmh": float}
-    """
+    """Aggregates multi-segment route data from Google Maps color intervals."""
     if not segments:
         return {"error": "Segments list cannot be empty"}
 
     vehicle_key = _normalize_vehicle_key(vehicle_class)
     if vehicle_key not in VEHICLE_PROFILES:
-        return {"error": f"Unknown vehicle '{vehicle_class}'. Valid: {list(VEHICLE_PROFILES.keys())}"}
+        return {"error": f"Unknown vehicle '{vehicle_class}'."}
 
     if fuel_type is None:
         fuel_key = DEFAULT_VEHICLE_FUELS[vehicle_key]
@@ -324,7 +391,7 @@ def calculate_route_from_gmaps_segments(
         "segments_breakdown": processed_segments,
         "_raw_consumption": total_consumption,
         "_raw_co2_kg": total_co2,
-        "congestion_index": avg_congestion  # Compatible key for route comparison
+        "congestion_index": avg_congestion
     }
 
 
@@ -335,7 +402,6 @@ def compare_gmaps_routes(
     fuel_type: str = None,
     custom_efficiency: float = None
 ) -> dict:
-    """Compares a congested Google Maps default route against a RouteZero alternative."""
     normal = calculate_route_from_gmaps_segments(
         normal_route_segments, vehicle_class, fuel_type, custom_efficiency
     )
@@ -371,25 +437,13 @@ def compare_gmaps_routes(
 
 
 if __name__ == "__main__":
-    # Example scenario: 
-    # Normal Route (40 km total): 10 km red gridlock, 12 km orange slowdown, 18 km blue flow.
-    # RouteZero Detour (46 km total): 3 km orange, 43 km entirely blue highway.
-    normal_route_google_data = [
-        {"distance_km": 15.0, "traffic": "red"},
-        {"distance_km": 12.0, "traffic": "orange"},
-        {"distance_km": 18.0, "traffic": "blue"}
-    ]
-
-    rz_route_google_data = [
-        {"distance_km": 3.0, "traffic": "orange"},
-        {"distance_km": 43.0, "traffic": "blue"}
-    ]
-
-    result = compare_gmaps_routes(
-        normal_route_segments=normal_route_google_data,
-        rz_route_segments=rz_route_google_data,
+    # Test with OSRM output (distance_km + avg_speed_kmh)
+    result = compare_routes(
+        normal_km=40.0,
+        normal_speed_kmh=18.0,   # 18 km/h (heavy traffic)
+        rz_km=44.0,
+        rz_speed_kmh=60.0,       # 60 km/h (free flow bypass)
         vehicle_class="sedan",
         fuel_type="petrol"
     )
-
     print(json.dumps(result, indent=4))
