@@ -9,27 +9,55 @@ import {
 
 export default function RouteComparison({ result }) {
 
+  const normalDistance =
+    Number(result.normal_route.total_distance_km) || 0
+
+  const optimizedDistance =
+    Number(result.optimized_route.total_distance_km) || 0
+
+  const normalTime =
+    Number(result.normal_route.total_duration_minutes) || 0
+
+  const optimizedTime =
+    Number(result.optimized_route.total_duration_minutes) || 0
+
+  const normalCO2 =
+    Number(result.emissions.normal_route.co2_kg) || 0
+
+  const optimizedCO2 =
+    Number(result.emissions.route_zero.co2_kg) || 0
+
   const distanceSaved =
-    result.normalRoute.distanceKm -
-    result.optimizedRoute.distanceKm
+    normalDistance - optimizedDistance
 
   const timeSaved =
-    result.normalRoute.timeMin -
-    result.optimizedRoute.timeMin
+    normalTime - optimizedTime
 
   const co2Saved =
-    result.normalRoute.co2Kg -
-    result.optimizedRoute.co2Kg
+    Number(
+      result.emissions.metrics_comparison?.co2_saved_kg
+    ) || (normalCO2 - optimizedCO2)
 
+  const backendCO2Percent =
+    Number(
+      result.emissions.metrics_comparison?.co2_percentage_reduction
+    )
+
+  const co2Percent = Number.isFinite(backendCO2Percent)
+    ? backendCO2Percent.toFixed(1)
+    : normalCO2 > 0
+    ? ((co2Saved / normalCO2) * 100).toFixed(1)
+    : '0.0'
 
   const distancePercent =
-    ((distanceSaved / result.normalRoute.distanceKm) * 100).toFixed(1)
+    normalDistance > 0
+      ? ((distanceSaved / normalDistance) * 100).toFixed(1)
+      : '0.0'
 
   const timePercent =
-    ((timeSaved / result.normalRoute.timeMin) * 100).toFixed(1)
-
-  const co2Percent =
-    ((co2Saved / result.normalRoute.co2Kg) * 100).toFixed(1)
+    normalTime > 0
+      ? ((timeSaved / normalTime) * 100).toFixed(1)
+      : '0.0'
 
 
   return (
@@ -37,9 +65,6 @@ export default function RouteComparison({ result }) {
     <section className="rounded-[28px] border border-ink-200 bg-white shadow-xl shadow-ink-900/[0.05] overflow-hidden">
 
       <div className="p-6 sm:p-8">
-
-
-        {/* Header */}
 
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-7">
 
@@ -62,7 +87,6 @@ export default function RouteComparison({ result }) {
 
             </div>
 
-
             <h3 className="text-2xl font-semibold tracking-tight text-ink-900">
               The difference is measurable.
             </h3>
@@ -72,7 +96,6 @@ export default function RouteComparison({ result }) {
             </p>
 
           </div>
-
 
           <div className="flex items-center gap-2 rounded-full bg-brand-50 border border-brand-100 px-3 py-2">
 
@@ -90,12 +113,7 @@ export default function RouteComparison({ result }) {
         </div>
 
 
-        {/* Comparison */}
-
         <div className="rounded-2xl border border-ink-100 overflow-hidden">
-
-
-          {/* Headings */}
 
           <div className="grid grid-cols-[1fr_40px_1fr] bg-ink-50/70">
 
@@ -107,9 +125,7 @@ export default function RouteComparison({ result }) {
 
             </div>
 
-
             <div />
-
 
             <div className="px-4 sm:px-6 py-3">
 
@@ -121,8 +137,6 @@ export default function RouteComparison({ result }) {
 
           </div>
 
-
-          {/* Distance */}
 
           <div className="grid grid-cols-[1fr_40px_1fr] items-center border-t border-ink-100">
 
@@ -142,22 +156,20 @@ export default function RouteComparison({ result }) {
               </div>
 
               <p className="text-lg font-semibold text-ink-800">
-                {result.normalRoute.distanceKm} km
+                {normalDistance.toFixed(1)} km
               </p>
 
             </div>
-
 
             <ArrowRight
               size={16}
               className="text-ink-300 mx-auto"
             />
 
-
             <div className="px-4 sm:px-6 py-5 bg-brand-50/40">
 
               <p className="text-lg font-semibold text-brand-700">
-                {result.optimizedRoute.distanceKm} km
+                {optimizedDistance.toFixed(1)} km
               </p>
 
               <p className="text-[10px] font-semibold text-brand-600 mt-1">
@@ -168,8 +180,6 @@ export default function RouteComparison({ result }) {
 
           </div>
 
-
-          {/* Time */}
 
           <div className="grid grid-cols-[1fr_40px_1fr] items-center border-t border-ink-100">
 
@@ -189,22 +199,20 @@ export default function RouteComparison({ result }) {
               </div>
 
               <p className="text-lg font-semibold text-ink-800">
-                {result.normalRoute.timeMin} min
+                {Math.round(normalTime)} min
               </p>
 
             </div>
-
 
             <ArrowRight
               size={16}
               className="text-ink-300 mx-auto"
             />
 
-
             <div className="px-4 sm:px-6 py-5 bg-brand-50/40">
 
               <p className="text-lg font-semibold text-brand-700">
-                {result.optimizedRoute.timeMin} min
+                {Math.round(optimizedTime)} min
               </p>
 
               <p className="text-[10px] font-semibold text-brand-600 mt-1">
@@ -215,8 +223,6 @@ export default function RouteComparison({ result }) {
 
           </div>
 
-
-          {/* CO2 */}
 
           <div className="grid grid-cols-[1fr_40px_1fr] items-center border-t border-ink-100">
 
@@ -236,22 +242,20 @@ export default function RouteComparison({ result }) {
               </div>
 
               <p className="text-lg font-semibold text-ink-800">
-                {result.normalRoute.co2Kg} kg
+                {normalCO2.toFixed(2)} kg
               </p>
 
             </div>
-
 
             <ArrowRight
               size={16}
               className="text-ink-300 mx-auto"
             />
 
-
             <div className="px-4 sm:px-6 py-5 bg-brand-50/40">
 
               <p className="text-lg font-semibold text-brand-700">
-                {result.optimizedRoute.co2Kg} kg
+                {optimizedCO2.toFixed(2)} kg
               </p>
 
               <p className="text-[10px] font-semibold text-brand-600 mt-1">
@@ -264,8 +268,6 @@ export default function RouteComparison({ result }) {
 
         </div>
 
-
-        {/* Bottom impact */}
 
         <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl bg-ink-900 px-5 py-4">
 
@@ -294,9 +296,8 @@ export default function RouteComparison({ result }) {
 
           </div>
 
-
           <p className="text-xl font-semibold text-brand-300">
-            {co2Saved.toFixed(1)} kg saved
+            {co2Saved.toFixed(2)} kg saved
           </p>
 
         </div>

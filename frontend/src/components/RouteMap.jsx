@@ -7,29 +7,24 @@ export default function RouteMap({
   pickup,
   stops = [],
   destination,
+  routeData,
 }) {
+
   const mapContainerRef = useRef(null)
   const mapRef = useRef(null)
-
   const routeLayerRef = useRef(null)
   const markerLayerRef = useRef(null)
 
-  const requestIdRef = useRef(0)
-
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [routeReady, setRouteReady] = useState(false)
+  const [error, setError] = useState('')
   const [distance, setDistance] = useState(null)
   const [duration, setDuration] = useState(null)
 
-  const validStops = stops.filter(
-    (stop) => stop && stop.trim()
-  )
-
-  const stopsKey = validStops.join('|')
-
   useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return
+
+    if (!mapContainerRef.current || mapRef.current) {
+      return
+    }
 
     const map = L.map(mapContainerRef.current, {
       zoomControl: true,
@@ -45,7 +40,8 @@ export default function RouteMap({
       }
     ).addTo(map)
 
-    markerLayerRef.current = L.layerGroup().addTo(map)
+    markerLayerRef.current =
+      L.layerGroup().addTo(map)
 
     mapRef.current = map
 
@@ -59,304 +55,213 @@ export default function RouteMap({
       routeLayerRef.current = null
       markerLayerRef.current = null
     }
+
   }, [])
 
-  const clearMap = () => {
-    if (!mapRef.current) return
+
+  useEffect(() => {
+
+    if (!mapRef.current || !routeData) {
+      return
+    }
+
+    if (
+      !routeData.coordinates ||
+      routeData.coordinates.length < 2
+    ) {
+      setError('No route coordinates were returned by the backend.')
+      setRouteReady(false)
+      return
+    }
+
+    setError('')
 
     if (routeLayerRef.current) {
-      mapRef.current.removeLayer(routeLayerRef.current)
+      mapRef.current.removeLayer(
+        routeLayerRef.current
+      )
+
       routeLayerRef.current = null
     }
 
     if (markerLayerRef.current) {
       markerLayerRef.current.clearLayers()
     }
-  }
 
-  const searchLocation = async (location) => {
-    const query = location.trim()
-
-    if (!query) {
-      throw new Error('Please enter a location.')
-    }
-
-    const url =
-      `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`
-
-    const response = await fetch(url)
-
-    if (!response.ok) {
-      throw new Error('Unable to find this location.')
-    }
-
-    const data = await response.json()
-
-    if (
-      !data.features ||
-      data.features.length === 0 ||
-      !data.features[0].geometry
-    ) {
-      throw new Error(`Could not find "${location}".`)
-    }
-
-    const coordinates = data.features[0].geometry.coordinates
-
-    return {
-      longitude: Number(coordinates[0]),
-      latitude: Number(coordinates[1]),
-    }
-  }
-
-  const loadRoute = async () => {
-    if (!mapRef.current || !pickup || !destination) return
-
-    const currentRequestId = ++requestIdRef.current
-
-    setLoading(true)
-    setError('')
-    setRouteReady(false)
-    setDistance(null)
-    setDuration(null)
-
-    clearMap()
-
-    try {
-      const locations = [
-        pickup,
-        ...validStops,
-        destination,
-      ]
-
-      const coordinates = []
-
-      for (const location of locations) {
-        const result = await searchLocation(location)
-
-        if (currentRequestId !== requestIdRef.current) {
-          return
-        }
-
-        coordinates.push(result)
-      }
-
-      if (coordinates.length < 2) {
-        throw new Error('At least two locations are required.')
-      }
-
-      const routeCoordinates = coordinates
-        .map(
+    const coordinates =
+      routeData.coordinates
+        .filter(
           (point) =>
-            `${point.longitude},${point.latitude}`
+            point &&
+            Number.isFinite(Number(point.latitude)) &&
+            Number.isFinite(Number(point.longitude))
         )
-        .join(';')
+        .map((point) => ({
+          name: point.name || '',
+          latitude: Number(point.latitude),
+          longitude: Number(point.longitude),
+        }))
 
-      const routeUrl =
-        `https://router.project-osrm.org/route/v1/driving/` +
-        routeCoordinates +
-        `?overview=full&geometries=geojson&alternatives=false`
 
-      const routeResponse = await fetch(routeUrl)
-
-      if (!routeResponse.ok) {
-        throw new Error('Unable to calculate the route.')
-      }
-
-      const routeData = await routeResponse.json()
-
-      if (currentRequestId !== requestIdRef.current) {
-        return
-      }
-
-      if (
-        routeData.code !== 'Ok' ||
-        !routeData.routes ||
-        routeData.routes.length === 0
-      ) {
-        throw new Error(
-          'No driving route could be found between these locations.'
-        )
-      }
-
-      const route = routeData.routes[0]
-
-      clearMap()
-
-      if (currentRequestId !== requestIdRef.current) {
-        return
-      }
-
-      const pickupIcon = L.divIcon({
-        className: '',
-        html: `
-          <div style="
-            width:18px;
-            height:18px;
-            background:#111827;
-            border:3px solid white;
-            border-radius:50%;
-            box-shadow:0 2px 8px rgba(0,0,0,.3);
-          "></div>
-        `,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9],
-      })
-
-      const stopIcon = L.divIcon({
-        className: '',
-        html: `
-          <div style="
-            width:18px;
-            height:18px;
-            background:#f59e0b;
-            border:3px solid white;
-            border-radius:50%;
-            box-shadow:0 2px 8px rgba(0,0,0,.3);
-          "></div>
-        `,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9],
-      })
-
-      const destinationIcon = L.divIcon({
-        className: '',
-        html: `
-          <div style="
-            width:18px;
-            height:18px;
-            background:#16a34a;
-            border:3px solid white;
-            border-radius:50%;
-            box-shadow:0 2px 8px rgba(0,0,0,.3);
-          "></div>
-        `,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9],
-      })
-
-      L.marker(
-        [
-          coordinates[0].latitude,
-          coordinates[0].longitude,
-        ],
-        {
-          icon: pickupIcon,
-        }
-      )
-        .bindPopup(
-          `<b>Pickup</b><br>${pickup}`
-        )
-        .addTo(markerLayerRef.current)
-
-      validStops.forEach((stop, index) => {
-        const point = coordinates[index + 1]
-
-        L.marker(
-          [
-            point.latitude,
-            point.longitude,
-          ],
-          {
-            icon: stopIcon,
-          }
-        )
-          .bindPopup(
-            `<b>Stop ${index + 1}</b><br>${stop}`
-          )
-          .addTo(markerLayerRef.current)
-      })
-
-      const destinationPoint =
-        coordinates[coordinates.length - 1]
-
-      L.marker(
-        [
-          destinationPoint.latitude,
-          destinationPoint.longitude,
-        ],
-        {
-          icon: destinationIcon,
-        }
-      )
-        .bindPopup(
-          `<b>Destination</b><br>${destination}`
-        )
-        .addTo(markerLayerRef.current)
-
-      routeLayerRef.current = L.geoJSON(
-        route.geometry,
-        {
-          style: {
-            color: '#16a34a',
-            weight: 6,
-            opacity: 0.9,
-          },
-        }
-      ).addTo(mapRef.current)
-
-      const bounds =
-        routeLayerRef.current.getBounds()
-
-      mapRef.current.fitBounds(bounds, {
-        padding: [40, 40],
-      })
-
-      setDistance(
-        (route.distance / 1000).toFixed(1)
-      )
-
-      setDuration(
-        Math.round(route.duration / 60)
-      )
-
-      setRouteReady(true)
-
-    } catch (err) {
-      if (
-        currentRequestId !==
-        requestIdRef.current
-      ) {
-        return
-      }
-
-      console.error(err)
-
-      clearMap()
-
+    if (coordinates.length < 2) {
       setError(
-        err.message ||
-          'Could not load the route. Please check the locations.'
+        'The backend returned invalid route coordinates.'
       )
 
       setRouteReady(false)
-
-    } finally {
-      if (
-        currentRequestId ===
-        requestIdRef.current
-      ) {
-        setLoading(false)
-      }
-    }
-  }
-
-  useEffect(() => {
-    if (!pickup || !destination) {
-      clearMap()
-
-      setRouteReady(false)
-      setError('')
-      setDistance(null)
-      setDuration(null)
-
       return
     }
 
-    loadRoute()
-  }, [pickup, destination, stopsKey])
+
+    const pickupIcon = L.divIcon({
+      className: '',
+      html: `
+        <div style="
+          width:18px;
+          height:18px;
+          background:#111827;
+          border:3px solid white;
+          border-radius:50%;
+          box-shadow:0 2px 8px rgba(0,0,0,.3);
+        "></div>
+      `,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    })
+
+
+    const stopIcon = L.divIcon({
+      className: '',
+      html: `
+        <div style="
+          width:18px;
+          height:18px;
+          background:#f59e0b;
+          border:3px solid white;
+          border-radius:50%;
+          box-shadow:0 2px 8px rgba(0,0,0,.3);
+        "></div>
+      `,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    })
+
+
+    const destinationIcon = L.divIcon({
+      className: '',
+      html: `
+        <div style="
+          width:18px;
+          height:18px;
+          background:#16a34a;
+          border:3px solid white;
+          border-radius:50%;
+          box-shadow:0 2px 8px rgba(0,0,0,.3);
+        "></div>
+      `,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    })
+
+
+    coordinates.forEach((point, index) => {
+
+      let icon = stopIcon
+      let label = `Stop ${index}`
+
+      if (index === 0) {
+        icon = pickupIcon
+        label = 'Pickup'
+      }
+
+      if (index === coordinates.length - 1) {
+        icon = destinationIcon
+        label = 'Destination'
+      }
+
+      L.marker(
+        [
+          point.latitude,
+          point.longitude,
+        ],
+        {
+          icon,
+        }
+      )
+        .bindPopup(
+          `<b>${label}</b><br>${point.name || ''}`
+        )
+        .addTo(markerLayerRef.current)
+
+    })
+
+
+    const lineCoordinates =
+      coordinates.map((point) => [
+        point.latitude,
+        point.longitude,
+      ])
+
+
+    routeLayerRef.current =
+      L.polyline(
+        lineCoordinates,
+        {
+          color: '#16a34a',
+          weight: 6,
+          opacity: 0.9,
+        }
+      ).addTo(mapRef.current)
+
+
+    const bounds =
+      routeLayerRef.current.getBounds()
+
+    if (bounds.isValid()) {
+
+      mapRef.current.fitBounds(
+        bounds,
+        {
+          padding: [50, 50],
+        }
+      )
+
+    }
+
+
+    const backendDistance =
+      Number(routeData.total_distance_km)
+
+    const backendDuration =
+      Number(routeData.total_duration_minutes)
+
+
+    setDistance(
+      Number.isFinite(backendDistance)
+        ? backendDistance.toFixed(1)
+        : null
+    )
+
+    setDuration(
+      Number.isFinite(backendDuration)
+        ? Math.round(backendDuration)
+        : null
+    )
+
+    setRouteReady(true)
+
+    setTimeout(() => {
+      mapRef.current?.invalidateSize()
+    }, 200)
+
+  }, [routeData])
+
 
   const openGoogleMaps = () => {
-    if (!pickup || !destination) return
+
+    if (!pickup || !destination) {
+      return
+    }
 
     let googleMapsUrl =
       `https://www.google.com/maps/dir/?api=1` +
@@ -364,11 +269,18 @@ export default function RouteMap({
       `&destination=${encodeURIComponent(destination)}` +
       `&travelmode=driving`
 
+    const validStops =
+      stops.filter(
+        (stop) => stop && stop.trim()
+      )
+
     if (validStops.length > 0) {
+
       googleMapsUrl +=
         `&waypoints=${encodeURIComponent(
           validStops.join('|')
         )}`
+
     }
 
     window.open(
@@ -378,7 +290,9 @@ export default function RouteMap({
     )
   }
 
+
   return (
+
     <div className="bg-white rounded-3xl border border-ink-200 shadow-lg shadow-ink-900/5 overflow-hidden">
 
       <div className="px-6 py-5 flex items-center justify-between border-b border-ink-100">
@@ -386,10 +300,12 @@ export default function RouteMap({
         <div className="flex items-center gap-4">
 
           <div className="w-12 h-12 rounded-xl bg-ink-900 flex items-center justify-center">
+
             <Map
               size={22}
               className="text-brand-400"
             />
+
           </div>
 
           <div>
@@ -406,6 +322,7 @@ export default function RouteMap({
 
         </div>
 
+
         <div className="flex items-center gap-5">
 
           <div className="hidden sm:flex items-center gap-5 text-sm text-ink-600">
@@ -416,11 +333,17 @@ export default function RouteMap({
             </span>
 
             <span className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+              Stops
+            </span>
+
+            <span className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-brand-500" />
               Destination
             </span>
 
           </div>
+
 
           <button
             onClick={openGoogleMaps}
@@ -440,6 +363,7 @@ export default function RouteMap({
 
       </div>
 
+
       <div className="relative">
 
         <div
@@ -447,13 +371,12 @@ export default function RouteMap({
           className="w-full h-[430px]"
         />
 
+
         <div className="absolute top-5 left-5 z-[500] bg-white rounded-full px-5 py-3 shadow-lg flex items-center gap-2">
 
           <span
             className={`w-3 h-3 rounded-full ${
-              loading
-                ? 'bg-yellow-400 animate-pulse'
-                : error
+              error
                 ? 'bg-red-500'
                 : routeReady
                 ? 'bg-green-500'
@@ -463,17 +386,16 @@ export default function RouteMap({
 
           <span className="text-sm font-semibold text-ink-700">
 
-            {loading
-              ? 'LOADING ROUTE'
-              : error
+            {error
               ? 'ROUTE ERROR'
               : routeReady
               ? 'ROUTE READY'
-              : 'ENTER LOCATIONS'}
+              : 'WAITING FOR ROUTE'}
 
           </span>
 
         </div>
+
 
         <div className="absolute bottom-5 left-5 z-[500] bg-white rounded-2xl px-5 py-4 shadow-xl">
 
@@ -483,17 +405,16 @@ export default function RouteMap({
 
           <p className="text-base font-semibold text-ink-900 mt-1">
 
-            {loading
-              ? 'Finding your route...'
-              : error
+            {error
               ? 'Route unavailable'
               : routeReady
               ? 'Ready to navigate'
-              : 'Enter locations above'}
+              : 'Waiting for backend route'}
 
           </p>
 
         </div>
+
 
         {routeReady && (
 
@@ -506,6 +427,7 @@ export default function RouteMap({
           </div>
 
         )}
+
 
         {error && (
 
@@ -529,6 +451,7 @@ export default function RouteMap({
 
       </div>
 
+
       <div className="grid grid-cols-3 border-t border-ink-100">
 
         <div className="px-5 py-4">
@@ -545,6 +468,7 @@ export default function RouteMap({
 
         </div>
 
+
         <div className="px-5 py-4 border-l border-ink-100">
 
           <p className="text-xs font-semibold text-ink-400 uppercase">
@@ -558,6 +482,7 @@ export default function RouteMap({
           </p>
 
         </div>
+
 
         <div className="px-5 py-4 border-l border-ink-100">
 

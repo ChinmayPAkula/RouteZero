@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useRef, useState } from 'react'
 
 import Header from './components/Header'
 import DeliveryForm from './components/DeliveryForm'
@@ -6,7 +6,7 @@ import ResultCards from './components/ResultCards'
 import RouteMap from './components/RouteMap'
 import RouteComparison from './components/RouteComparison'
 
-import { dummyResult } from './data/dummyData'
+const API_URL = 'http://127.0.0.1:8000/plan-route'
 
 export default function App() {
   const [formData, setFormData] = useState({
@@ -18,18 +18,100 @@ export default function App() {
   })
 
   const [showResults, setShowResults] = useState(false)
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const resultsRef = useRef(null)
 
-  const handleOptimize = () => {
-    setShowResults(true)
+  const handleOptimize = async () => {
+    if (!formData.pickup.trim() || !formData.drop.trim()) {
+      setError('Please enter both pickup and destination.')
+      return
+    }
 
-    setTimeout(() => {
-      resultsRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
+    setLoading(true)
+    setError('')
+    setShowResults(false)
+    setResult(null)
+
+    const payload = {
+      pickup_location: formData.pickup,
+      stops: formData.stops.filter(
+        (stop) => stop && stop.trim()
+      ),
+      destination: formData.drop,
+      vehicle_class: formData.vehicle,
+      fuel_type: formData.fuelType,
+    }
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       })
-    }, 100)
+
+      if (!response.ok) {
+        let message = 'Unable to optimize the route.'
+
+        try {
+          const errorData = await response.json()
+
+          if (errorData.detail) {
+            message =
+              typeof errorData.detail === 'string'
+                ? errorData.detail
+                : 'Backend rejected the route request.'
+          }
+        } catch {
+          // Keep default error message
+        }
+
+        throw new Error(message)
+      }
+
+      const data = await response.json()
+
+      if (
+        !data.normal_route ||
+        !data.optimized_route ||
+        !data.emissions
+      ) {
+        throw new Error(
+          'The backend returned an unexpected response.'
+        )
+      }
+
+      setResult(data)
+      setShowResults(true)
+
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      }, 100)
+
+    } catch (err) {
+      console.error('Route optimization error:', err)
+
+      if (err instanceof TypeError) {
+        setError(
+          'Failed to connect to the backend. Make sure Khanak\'s backend is running on port 8000.'
+        )
+      } else {
+        setError(
+          err.message ||
+            'Something went wrong while optimizing the route.'
+        )
+      }
+
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -61,9 +143,18 @@ export default function App() {
           formData={formData}
           setFormData={setFormData}
           onOptimize={handleOptimize}
+          loading={loading}
         />
 
-        {showResults && (
+        {error && (
+          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
+            <p className="text-sm font-semibold text-red-600">
+              {error}
+            </p>
+          </div>
+        )}
+
+        {showResults && result && (
           <div
             ref={resultsRef}
             className="mt-10 space-y-8 animate-fade-in-up"
@@ -95,15 +186,16 @@ export default function App() {
 
             </div>
 
-            <ResultCards result={dummyResult} />
+            <ResultCards result={result} />
 
             <RouteMap
               pickup={formData.pickup}
               stops={formData.stops}
               destination={formData.drop}
+              routeData={result.optimized_route}
             />
 
-            <RouteComparison result={dummyResult} />
+            <RouteComparison result={result} />
 
           </div>
         )}

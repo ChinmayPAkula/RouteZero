@@ -12,6 +12,7 @@ export default function DeliveryForm({
   formData,
   setFormData,
   onOptimize,
+  loading,
 }) {
 
   const handleChange = (field, value) => {
@@ -29,24 +30,23 @@ export default function DeliveryForm({
   }
 
   const updateStop = (index, value) => {
-    const updatedStops = [...formData.stops]
-
-    updatedStops[index] = value
+    const newStops = [...formData.stops]
+    newStops[index] = value
 
     setFormData({
       ...formData,
-      stops: updatedStops,
+      stops: newStops,
     })
   }
 
   const removeStop = (index) => {
-    const updatedStops = formData.stops.filter(
-      (_, stopIndex) => stopIndex !== index
+    const newStops = formData.stops.filter(
+      (_, i) => i !== index
     )
 
     setFormData({
       ...formData,
-      stops: updatedStops,
+      stops: newStops,
     })
   }
 
@@ -57,10 +57,7 @@ export default function DeliveryForm({
         Delivery Details
       </h2>
 
-      {/* PICKUP */}
-
       <div>
-
         <label className="block text-sm font-medium text-ink-600 mb-2">
           Pickup Location
         </label>
@@ -83,68 +80,67 @@ export default function DeliveryForm({
           />
 
         </div>
-
       </div>
-
-      {/* STOPS */}
 
       <div>
 
         <div className="flex items-center justify-between mb-2">
 
           <label className="block text-sm font-medium text-ink-600">
-            Delivery Stops
+            Stops
           </label>
 
           <button
             type="button"
             onClick={addStop}
-            className="flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700 transition"
+            className="flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
           >
             <Plus size={14} />
-            Add Stop
+            Add stop
           </button>
 
         </div>
 
         {formData.stops.length === 0 && (
-
-          <p className="text-xs text-ink-400 mb-2">
-            Add multiple delivery locations if required.
+          <p className="text-xs text-ink-400">
+            Add delivery stops if your route has multiple destinations.
           </p>
-
         )}
 
-        <div className="space-y-2.5">
+        <div className="space-y-2">
 
           {formData.stops.map((stop, index) => (
 
             <div
               key={index}
-              className="relative"
+              className="relative flex items-center gap-2"
             >
 
-              <MapPin
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500"
-                size={17}
-              />
+              <div className="relative flex-1">
 
-              <input
-                type="text"
-                value={stop}
-                onChange={(e) =>
-                  updateStop(index, e.target.value)
-                }
-                placeholder={`Enter stop ${index + 1}`}
-                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-ink-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
-              />
+                <Navigation
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500"
+                  size={17}
+                />
+
+                <input
+                  type="text"
+                  value={stop}
+                  onChange={(e) =>
+                    updateStop(index, e.target.value)
+                  }
+                  placeholder={`Enter stop ${index + 1}`}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-ink-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+                />
+
+              </div>
 
               <button
                 type="button"
                 onClick={() => removeStop(index)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-red-500 transition"
+                className="w-9 h-9 rounded-xl border border-ink-200 flex items-center justify-center text-ink-400 hover:text-red-500 hover:border-red-200 transition"
               >
-                <X size={17} />
+                <X size={16} />
               </button>
 
             </div>
@@ -154,8 +150,6 @@ export default function DeliveryForm({
         </div>
 
       </div>
-
-      {/* DESTINATION */}
 
       <div>
 
@@ -184,16 +178,12 @@ export default function DeliveryForm({
 
       </div>
 
-      {/* VEHICLE */}
-
       <VehicleSelector
         selected={formData.vehicle}
         onSelect={(id) =>
           handleChange('vehicle', id)
         }
       />
-
-      {/* FUEL TYPE */}
 
       <div>
 
@@ -206,39 +196,27 @@ export default function DeliveryForm({
           onChange={(e) =>
             handleChange('fuelType', e.target.value)
           }
-          className="w-full px-4 py-2.5 rounded-xl border border-ink-200 bg-white text-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+          className="w-full px-4 py-2.5 rounded-xl border border-ink-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition text-sm text-ink-700"
         >
-
-          <option value="petrol">
-            Petrol
-          </option>
-
-          <option value="diesel">
-            Diesel
-          </option>
-
-          <option value="electric">
-            Electric
-          </option>
-
-          <option value="cng">
-            CNG
-          </option>
-
+          <option value="petrol">Petrol</option>
+          <option value="diesel">Diesel</option>
+          <option value="electric">Electric</option>
+          <option value="cng">CNG</option>
         </select>
 
       </div>
 
-      {/* OPTIMIZE */}
-
       <button
         onClick={onOptimize}
-        className="w-full bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white font-medium py-3 rounded-xl transition shadow-md shadow-brand-500/30 hover:shadow-lg hover:shadow-brand-500/40 flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0"
+        disabled={loading}
+        className="w-full bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition shadow-md shadow-brand-500/30 hover:shadow-lg hover:shadow-brand-500/40 flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0"
       >
 
         <Sparkles size={18} />
 
-        Optimize Route
+        {loading
+          ? 'Optimizing Route...'
+          : 'Optimize Route'}
 
       </button>
 

@@ -1,5 +1,7 @@
 import {
   Bike,
+  Truck,
+  Van,
   Car,
   Check,
 } from 'lucide-react'
@@ -11,13 +13,17 @@ const icons = {
   auto: Car,
   sedan: Car,
   suv: Car,
+  mini_van: Van,
+  truck: Truck,
 }
 
 export default function VehicleSelector({
   selected,
   onSelect,
 }) {
+
   return (
+
     <div>
 
       <div className="flex items-center justify-between mb-3">
@@ -32,12 +38,11 @@ export default function VehicleSelector({
 
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
 
         {vehicleOptions.map((vehicle) => {
 
           const Icon = icons[vehicle.id]
-
           const isSelected = selected === vehicle.id
 
           return (

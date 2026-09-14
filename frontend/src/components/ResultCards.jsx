@@ -43,22 +43,17 @@ function ResultCard({
           {icon}
         </div>
 
-
         {highlight && (
-
           <span className="text-[9px] uppercase tracking-wider font-bold text-brand-600">
             Impact
           </span>
-
         )}
 
       </div>
 
-
       <p className="text-[11px] font-medium text-ink-400 mt-5">
         {label}
       </p>
-
 
       <p
         className={`
@@ -73,26 +68,45 @@ function ResultCard({
         {value}
       </p>
 
-
       <p className="text-[10px] text-ink-400 mt-1">
         {detail}
       </p>
 
     </div>
-
   )
 }
 
 
 export default function ResultCards({ result }) {
 
+  const normalDistance =
+    Number(result.normal_route.total_distance_km) || 0
+
+  const optimizedDistance =
+    Number(result.optimized_route.total_distance_km) || 0
+
+  const normalTime =
+    Number(result.normal_route.total_duration_minutes) || 0
+
+  const optimizedTime =
+    Number(result.optimized_route.total_duration_minutes) || 0
+
+  const normalCO2 =
+    Number(result.emissions.normal_route.co2_kg) || 0
+
+  const optimizedCO2 =
+    Number(result.emissions.route_zero.co2_kg) || 0
+
   const distanceSaved =
-    result.normalRoute.distanceKm -
-    result.optimizedRoute.distanceKm
+    normalDistance - optimizedDistance
 
   const timeSaved =
-    result.normalRoute.timeMin -
-    result.optimizedRoute.timeMin
+    normalTime - optimizedTime
+
+  const co2Saved =
+    Number(
+      result.emissions.metrics_comparison?.co2_saved_kg
+    ) || (normalCO2 - optimizedCO2)
 
 
   return (
@@ -113,7 +127,6 @@ export default function ResultCards({ result }) {
 
         </div>
 
-
         <span className="hidden sm:block text-xs text-ink-400">
           Compared with standard routing
         </span>
@@ -126,23 +139,23 @@ export default function ResultCards({ result }) {
         <ResultCard
           icon={<Route size={18} />}
           label="DISTANCE"
-          value={`${result.optimizedRoute.distanceKm} km`}
-          detail={`${distanceSaved.toFixed(1)} km shorter`}
+          value={`${optimizedDistance.toFixed(1)} km`}
+          detail={`${Math.max(distanceSaved, 0).toFixed(1)} km shorter`}
         />
 
 
         <ResultCard
           icon={<Clock3 size={18} />}
           label="ESTIMATED TIME"
-          value={`${result.optimizedRoute.timeMin} min`}
-          detail={`${timeSaved} min faster`}
+          value={`${Math.round(optimizedTime)} min`}
+          detail={`${Math.max(Math.round(timeSaved), 0)} min faster`}
         />
 
 
         <ResultCard
           icon={<Leaf size={18} />}
           label="CO₂ EMITTED"
-          value={`${result.optimizedRoute.co2Kg} kg`}
+          value={`${optimizedCO2.toFixed(2)} kg`}
           detail="Estimated emissions"
         />
 
@@ -150,7 +163,7 @@ export default function ResultCards({ result }) {
         <ResultCard
           icon={<TrendingDown size={18} />}
           label="CO₂ SAVED"
-          value={`${result.co2SavedKg.toFixed(1)} kg`}
+          value={`${co2Saved.toFixed(2)} kg`}
           detail="Lower than standard route"
           highlight
         />
