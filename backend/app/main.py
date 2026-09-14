@@ -1,5 +1,7 @@
 import sys
 from pathlib import Path
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # Add sibling module folders to Python's import path
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "route-optimization"))
@@ -24,6 +26,12 @@ from carbon_calc.calculator import compare_routes
 
 app = FastAPI(title="RouteZero Backend")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # fine for local dev; tighten later if deployed
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health")
 def health() -> dict[str, str]:
