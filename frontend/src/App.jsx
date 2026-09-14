@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 import Header from './components/Header'
 import DeliveryForm from './components/DeliveryForm'
@@ -8,35 +8,36 @@ import RouteComparison from './components/RouteComparison'
 
 import { dummyResult } from './data/dummyData'
 
-
 export default function App() {
-
   const [formData, setFormData] = useState({
     pickup: '',
+    stops: [],
     drop: '',
-    vehicle: 'van',
+    vehicle: 'two_wheeler',
+    fuelType: 'petrol',
   })
-
 
   const [showResults, setShowResults] = useState(false)
 
+  const resultsRef = useRef(null)
 
   const handleOptimize = () => {
     setShowResults(true)
+
+    setTimeout(() => {
+      resultsRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 100)
   }
 
-
   return (
-
     <div className="min-h-screen">
 
       <Header />
 
-
       <main className="max-w-6xl mx-auto px-5 sm:px-6 py-8 sm:py-10">
-
-
-        {/* Intro */}
 
         <div className="max-w-3xl mb-7">
 
@@ -56,24 +57,17 @@ export default function App() {
 
         </div>
 
-
-        {/* Planner */}
-
         <DeliveryForm
           formData={formData}
           setFormData={setFormData}
           onOptimize={handleOptimize}
         />
 
-
-        {/* Results */}
-
         {showResults && (
-
-          <div className="mt-10 space-y-8 animate-fade-in-up">
-
-
-            {/* Result heading */}
+          <div
+            ref={resultsRef}
+            className="mt-10 space-y-8 animate-fade-in-up"
+          >
 
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
 
@@ -89,7 +83,6 @@ export default function App() {
 
               </div>
 
-
               <div className="flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 self-start sm:self-auto">
 
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-500" />
@@ -102,28 +95,17 @@ export default function App() {
 
             </div>
 
+            <ResultCards result={dummyResult} />
 
-            {/* Stats */}
-
-            <ResultCards
-              result={dummyResult}
+            <RouteMap
+              pickup={formData.pickup}
+              stops={formData.stops}
+              destination={formData.drop}
             />
 
-
-            {/* Map */}
-
-            <RouteMap />
-
-
-            {/* Comparison */}
-
-            <RouteComparison
-              result={dummyResult}
-            />
-
+            <RouteComparison result={dummyResult} />
 
           </div>
-
         )}
 
       </main>
