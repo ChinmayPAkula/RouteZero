@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
-import app.main as main_module
-from app.main import app
-from app.models import Coordinate
-from app.config import MAX_LOCATIONS
+import route_optimization.main as main_module
+from route_optimization.main import app
+from route_optimization.models import Coordinate
+from route_optimization.config import MAX_LOCATIONS
 
 client = TestClient(app)
 

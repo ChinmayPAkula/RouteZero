@@ -1,4 +1,4 @@
-from app.optimizer import calculate_route_totals, optimize_route
+from route_optimization.optimizer import calculate_route_totals, optimize_route
 
 
 def test_fixed_start_end_and_visits_each_stop_once():

@@ -1,9 +1,9 @@
 import httpx
 import pytest
 
-from app.errors import RoutingError
-from app.models import Coordinate
-import app.routing as routing
+from route_optimization.errors import RoutingError
+from route_optimization.models import Coordinate
+import route_optimization.routing as routing
 
 
 POINTS = [
