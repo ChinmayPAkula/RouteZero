@@ -1,10 +1,12 @@
 import sys
 from pathlib import Path
 
-# Add sibling module folder to Python's import path
+# Add sibling module folders to Python's import path
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "route-optimization"))
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "carbon-calc"))
 
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 from route_optimization.errors import (
     GeocodingError,
@@ -14,10 +16,11 @@ from route_optimization.errors import (
     RoutingError,
 )
 from route_optimization.geocoding import geocode_locations
-from route_optimization.models import OptimizeRouteRequest, OptimizeRouteResponse
+from route_optimization.models import OptimizeRouteRequest, RouteResult
 from route_optimization.optimizer import optimize_route
 from route_optimization.routing import get_route_matrices
 from route_optimization.main import build_route_result
+from carbon_calc.calculator import compare_routes
 
 app = FastAPI(title="RouteZero Backend")
 
@@ -27,8 +30,7 @@ def health() -> dict[str, str]:
     return {"status": "healthy"}
 
 
-@app.post("/optimize-route", response_model=OptimizeRouteResponse)
-def optimize(request: OptimizeRouteRequest) -> OptimizeRouteResponse:
+def _compute_routes(request: OptimizeRouteRequest):
     names = [request.pickup_location, *request.stops, request.destination]
 
     try:
@@ -54,7 +56,55 @@ def optimize(request: OptimizeRouteRequest) -> OptimizeRouteResponse:
     except OptimizationError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    return OptimizeRouteResponse(
+    return normal_route, optimized_route
+
+
+class PlanRouteRequest(OptimizeRouteRequest):
+    vehicle_class: str
+    fuel_type: str | None = None
+
+
+class EmissionsComparison(BaseModel):
+    vehicle_type: str
+    normal_route: dict
+    route_zero: dict
+    metrics_comparison: dict
+
+
+class PlanRouteResponse(BaseModel):
+    normal_route: RouteResult
+    optimized_route: RouteResult
+    emissions: EmissionsComparison
+
+
+def compute_avg_speed_kmh(route: RouteResult) -> float:
+    hours = route.total_duration_minutes / 60
+    if hours <= 0:
+        return 0.0
+    return route.total_distance_km / hours
+
+
+@app.post("/plan-route", response_model=PlanRouteResponse)
+def plan_route(request: PlanRouteRequest) -> PlanRouteResponse:
+    normal_route, optimized_route = _compute_routes(request)
+
+    normal_speed = compute_avg_speed_kmh(normal_route)
+    optimized_speed = compute_avg_speed_kmh(optimized_route)
+
+    emissions_result = compare_routes(
+        normal_km=normal_route.total_distance_km,
+        normal_speed_kmh=normal_speed,
+        rz_km=optimized_route.total_distance_km,
+        rz_speed_kmh=optimized_speed,
+        vehicle_class=request.vehicle_class,
+        fuel_type=request.fuel_type,
+    )
+
+    if "error" in emissions_result:
+        raise HTTPException(status_code=400, detail=emissions_result["error"])
+
+    return PlanRouteResponse(
         normal_route=normal_route,
         optimized_route=optimized_route,
+        emissions=EmissionsComparison(**emissions_result),
     )
