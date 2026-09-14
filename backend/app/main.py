@@ -15,8 +15,9 @@ from route_optimization.errors import (
 )
 from route_optimization.geocoding import geocode_locations
 from route_optimization.models import OptimizeRouteRequest, OptimizeRouteResponse
-from route_optimization.optimizer import calculate_route_totals, optimize_route
+from route_optimization.optimizer import optimize_route
 from route_optimization.routing import get_route_matrices
+from route_optimization.main import build_route_result
 
 app = FastAPI(title="RouteZero Backend")
 
@@ -33,10 +34,17 @@ def optimize(request: OptimizeRouteRequest) -> OptimizeRouteResponse:
     try:
         coordinates = geocode_locations(names)
         distance_matrix, duration_matrix = get_route_matrices(coordinates)
-        route_indexes = optimize_route(distance_matrix)
-        total_distance, total_duration = calculate_route_totals(
-            route_indexes, distance_matrix, duration_matrix
+
+        normal_route_indexes = list(range(len(names)))
+        optimized_route_indexes = optimize_route(distance_matrix)
+
+        normal_route = build_route_result(
+            normal_route_indexes, names, coordinates, distance_matrix, duration_matrix
         )
+        optimized_route = build_route_result(
+            optimized_route_indexes, names, coordinates, distance_matrix, duration_matrix
+        )
+
     except (LocationNotFoundError, OutsideTamilNaduError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except GeocodingError as exc:
@@ -46,12 +54,7 @@ def optimize(request: OptimizeRouteRequest) -> OptimizeRouteResponse:
     except OptimizationError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    ordered_coordinates = [coordinates[i] for i in route_indexes]
     return OptimizeRouteResponse(
-        route=[names[i] for i in route_indexes],
-        coordinates=ordered_coordinates,
-        total_distance=total_distance,
-        total_duration=total_duration,
-        total_distance_km=round(total_distance / 1000, 2),
-        total_duration_minutes=round(total_duration / 60, 1),
+        normal_route=normal_route,
+        optimized_route=optimized_route,
     )
