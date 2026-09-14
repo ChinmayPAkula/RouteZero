@@ -25,20 +25,26 @@ export const dummyResult = {
 
 export const vehicleOptions = [
   {
-    id: 'bike',
+    id: 'two_wheeler',
     label: 'Two-Wheeler',
     capacityKg: 20,
   },
 
   {
-    id: 'van',
-    label: 'Mini Van',
-    capacityKg: 500,
+    id: 'auto',
+    label: 'Auto',
+    capacityKg: 300,
   },
 
   {
-    id: 'truck',
-    label: 'Truck',
-    capacityKg: 2000,
+    id: 'sedan',
+    label: 'Sedan',
+    capacityKg: 400,
+  },
+
+  {
+    id: 'suv',
+    label: 'SUV',
+    capacityKg: 600,
   },
 ]

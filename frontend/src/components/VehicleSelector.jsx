@@ -1,27 +1,23 @@
 import {
   Bike,
-  Truck,
-  Van,
+  Car,
   Check,
 } from 'lucide-react'
 
 import { vehicleOptions } from '../data/dummyData'
 
-
 const icons = {
-  bike: Bike,
-  van: Van,
-  truck: Truck,
+  two_wheeler: Bike,
+  auto: Car,
+  sedan: Car,
+  suv: Car,
 }
-
 
 export default function VehicleSelector({
   selected,
   onSelect,
 }) {
-
   return (
-
     <div>
 
       <div className="flex items-center justify-between mb-3">
@@ -36,8 +32,7 @@ export default function VehicleSelector({
 
       </div>
 
-
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5">
 
         {vehicleOptions.map((vehicle) => {
 
@@ -75,7 +70,6 @@ export default function VehicleSelector({
 
               )}
 
-
               <div
                 className={`
                   w-9 h-9 rounded-xl flex items-center justify-center mb-3
@@ -91,7 +85,6 @@ export default function VehicleSelector({
 
               </div>
 
-
               <p
                 className={`
                   text-xs font-semibold
@@ -105,7 +98,6 @@ export default function VehicleSelector({
                 {vehicle.label}
               </p>
 
-
               <p className="text-[10px] text-ink-400 mt-1">
                 Up to {vehicle.capacityKg} kg
               </p>
@@ -113,7 +105,6 @@ export default function VehicleSelector({
             </button>
 
           )
-
         })}
 
       </div>
